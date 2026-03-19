@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 
 try:
-	from preprocessing import load_graph_data
+	from preprocessing import INF, load_graph_data
 except ModuleNotFoundError:
-	from .preprocessing import load_graph_data
+	from .preprocessing import INF, load_graph_data
 
 
 def build_weight_matrix(connectivity_minutes: list[list[int]] | np.ndarray) -> np.ndarray:
@@ -15,8 +15,8 @@ def build_weight_matrix(connectivity_minutes: list[list[int]] | np.ndarray) -> n
 	if connectivity_np.ndim != 2 or connectivity_np.shape[0] != connectivity_np.shape[1]:
 		raise ValueError("La matriz de conectividad debe ser cuadrada.")
 
-	size = connectivity_np.shape[0]
-	weights = np.where(connectivity_np > 0, connectivity_np, np.inf)
+	weights = connectivity_np.copy()
+	weights[weights >= INF] = np.inf
 	np.fill_diagonal(weights, 0.0)
 	return weights
 

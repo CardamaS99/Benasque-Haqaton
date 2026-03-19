@@ -6,6 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
+INF = 999999
+
 
 @dataclass
 class Node:
@@ -48,7 +50,7 @@ def _find_matrix_header(rows: list[list[str]]) -> tuple[int, int, list[int]]:
 def _parse_time_to_minutes(value: str) -> int:
 	value = _clean(value)
 	if not value or value.upper() == "X":
-		return 0
+		return INF
 
 	if "'" in value:
 		hours, minutes = value.split("'", maxsplit=1)
@@ -58,7 +60,7 @@ def _parse_time_to_minutes(value: str) -> int:
 	if _is_int(value):
 		return int(value)
 
-	return 0
+	return INF
 
 
 def extract_nodes(rows: list[list[str]]) -> list[Node]:
@@ -139,7 +141,10 @@ def extract_connectivity_matrix(rows: list[list[str]]) -> tuple[list[int], list[
 		if len(matrix_by_row_label) == size:
 			break
 
-	matrix = [matrix_by_row_label.get(label, [0] * size) for label in column_labels]
+	matrix = [matrix_by_row_label.get(label, [INF] * size) for label in column_labels]
+	for index in range(size):
+		if matrix[index][index] == INF:
+			matrix[index][index] = 0
 	return column_labels, matrix
 
 
@@ -156,7 +161,11 @@ def convert_to_sparse(labels: list[int], matrix: list[list[int]] | np.ndarray) -
 	if len(labels_np) != matrix_np.shape[0]:
 		raise ValueError("El número de etiquetas debe coincidir con el número de filas de la matriz.")
 
-	row_indices, col_indices = np.nonzero(matrix_np > 0)
+	mask = matrix_np != INF
+	if matrix_np.shape[0] == matrix_np.shape[1]:
+		np.fill_diagonal(mask, False)
+
+	row_indices, col_indices = np.nonzero(mask)
 	if row_indices.size == 0:
 		return np.empty((0, 3), dtype=np.int32)
 

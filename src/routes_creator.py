@@ -1,126 +1,214 @@
 import csv
-import numpy as np
-import pandas as pd
+import io
 from pathlib import Path
 
-# 1. IMPORTACIÓN DESDE TU OTRO SCRIPT
-# Importamos la función que creamos en preprocessing2.py
+import numpy as np
+import pandas as pd
+import streamlit as st
+
 try:
-    from routes_creator import get_sparse_connectivity, INF
+    from preprocessing import INF, load_graph_data, convert_to_sparse
 except ImportError:
-    print("❌ Error: No se pudo importar 'get_sparse_connectivity' de preprocessing2.py")
-    print("Asegúrate de que ambos archivos estén en la misma carpeta.")
-    INF = 999999
+    from .preprocessing import INF, load_graph_data, convert_to_sparse
 
-# Configuración de Pandas para que la tabla se vea bien en consola
-pd.set_option('display.max_rows', 500)
-pd.set_option('display.max_columns', 500)
-pd.set_option('display.width', 1000)
 
-def get_user_preferences(available_nodes):
-    print("\n" + "="*50)
-    print("🌲 CONFIGURACIÓN DE TU RUTA PERSONALIZADA 🌲")
-    print("="*50)
+@st.cache_data
+def load_data():
+    """Load graph data from CSV"""
+    project_root = Path(__file__).resolve().parents[1]
+    csv_path = project_root / "data" / "data.csv"
+
+    nodes, labels, connectivity_matrix = load_graph_data(csv_path)
     
-    # Mostrar lista para elegir inicio
-    print("\n📍 Lugares disponibles:")
-    for n in available_nodes:
-        print(f"[{n['id']}] {n['name']} ({n['elev']}m)")
+    node_dict = {node.id: {"name": node.place, "elev": node.elevation, "gear": node.summer_gear} for node in nodes}
     
-    try:
-        start_id = int(input("\n👉 Introduce el ID de tu PUNTO DE PARTIDA: "))
-    except ValueError:
-        start_id = 1 # Por defecto Benasque o el ID 1
+    return labels, connectivity_matrix, node_dict
 
-    try:
-        max_elev = int(input("🏔️ ¿Altitud máxima permitida? (Ej: 2200): "))
-    except ValueError:
-        max_elev = 3404 # Altura del Aneto por defecto
-        
-    print("\n🛡️ ¿Qué equipo llevas? (U: Urban, T: Trail, M: Mountain, S: Snow)")
-    opcion_gear = input("Selecciona (ej: UTM): ").upper()
+
+def format_matrix_display(matrix, inf_value=999999, replacement="∞"):
+    """Format matrix for display, replacing inf with ∞"""
+    display_matrix = np.where(
+        (matrix == inf_value) | np.isinf(matrix),
+        replacement,
+        matrix.astype(int)
+    )
+    return display_matrix
+
+
+def build_submatrix(connectivity_matrix, labels, valid_ids):
+    """Build submatrix for valid node IDs"""
+    id_to_idx = {label: i for i, label in enumerate(labels)}
+    valid_ids_set = set(valid_ids)
     
-    gear_map = {'U': 'Urban', 'T': 'Trail', 'M': 'Mountain', 'S': 'Snow'}
-    allowed_gears = [gear_map[letter] for letter in opcion_gear if letter in gear_map]
+    n_sub = len(valid_ids)
+    sub_matrix = np.full((n_sub, n_sub), INF, dtype=float)
+    np.fill_diagonal(sub_matrix, 0)
+    
+    connectivity_np = np.asarray(connectivity_matrix, dtype=float)
+    
+    for i, u in enumerate(valid_ids):
+        for j, v in enumerate(valid_ids):
+            if u in id_to_idx and v in id_to_idx:
+                u_idx = id_to_idx[u]
+                v_idx = id_to_idx[v]
+                val = connectivity_np[u_idx, v_idx]
+                if val != INF:
+                    sub_matrix[i, j] = val
+    
+    return sub_matrix
 
-    return start_id, max_elev, allowed_gears
+
+def sparse_to_csv(sparse_array):
+    """Convert sparse array to CSV string"""
+    output = io.StringIO()
+    output.write("source,target,minutes\n")
+    for row in sparse_array:
+        output.write(f"{int(row[0])},{int(row[1])},{int(row[2])}\n")
+    return output.getvalue()
+
+
+def dense_to_csv(matrix, node_ids):
+    """Convert dense matrix to CSV string"""
+    output = io.StringIO()
+    output.write("," + ",".join(str(n) for n in node_ids) + "\n")
+    for i, row_id in enumerate(node_ids):
+        row_vals = [str(int(val)) if val != INF else str(int(INF)) for val in matrix[i]]
+        output.write(f"{row_id}," + ",".join(row_vals) + "\n")
+    return output.getvalue()
+
 
 def main():
-    # --- DEFINICIÓN DE LA RUTA DEL CSV ---
-    # Aquí definimos dónde está el archivo realmente
-    csv_path = Path(__file__).resolve().parent.parent / "data" / "data.csv" # Ajusta según tu estructura: "data/data.csv"
+    st.set_page_config(page_title="🌲 Route Creator", layout="wide")
     
-    if not csv_path.exists():
-        print(f"❌ Error: No se encuentra el archivo CSV en: {csv_path.absolute()}")
-        return
-
-    # 1. Llamada a preproccessing2 pasándole la ruta del CSV
-    try:
-        # Aquí es donde le 'decimos' a la otra función dónde está el archivo
-        sparse_matrix = get_sparse_connectivity(csv_path)
-
-        # Append at the end of sparse_matrix the transpose of the original sparse_matrix (to ensure simetría)
-        if sparse_matrix.size > 0:
-            sparse_matrix = np.vstack((sparse_matrix, sparse_matrix[:, [1, 0, 2]]))
-
-    except Exception as e:
-        print(f"❌ Error al procesar la sparse en preproccessing2: {e}")
-        return
-
-    # 2. Leer metadatos de nodos para el filtrado
-    all_nodes = []
-    with open(csv_path, 'r', encoding='utf-8') as f:
-        reader = list(csv.reader(f))
-        for row in reader:
-            if row and row[0].isdigit():
-                all_nodes.append({
-                    'id': int(row[0]),
-                    'name': row[1],
-                    'elev': int(row[3]),
-                    'gear': row[5]
-                })
-
-    # 3. Pedir preferencias
-    start_id, max_elev, allowed_gears = get_user_preferences(all_nodes)
-
-    # 4. Filtrar nodos (siempre incluimos el ID de inicio)
+    st.title("🌲 Smart Route Creator")
+    st.markdown("Build personalized hiking routes with custom preferences")
+    
+    # Load data
+    labels, connectivity_matrix, node_dict = load_data()
+    all_nodes = [{"id": label, "name": node_dict[label]["name"], "elev": node_dict[label]["elev"], "gear": node_dict[label]["gear"]} for label in labels]
+    
+    # Sidebar for preferences
+    st.sidebar.header("⚙️ Route Preferences")
+    
+    st.sidebar.subheader("📍 Starting Point")
+    start_id = st.sidebar.selectbox(
+        "Select starting location:",
+        options=[n["id"] for n in all_nodes],
+        format_func=lambda x: f"[{x}] {node_dict[x]['name']} ({node_dict[x]['elev']}m)"
+    )
+    
+    st.sidebar.subheader("🏔️ Elevation Constraints")
+    max_elev = st.sidebar.slider(
+        "Maximum elevation allowed (m):",
+        min_value=1000,
+        max_value=3500,
+        value=3404,
+        step=100
+    )
+    
+    st.sidebar.subheader("🛡️ Available Gear")
+    gear_options = st.sidebar.multiselect(
+        "Select gear types:",
+        options=["Urban", "Trail", "Mountain", "Snow"],
+        default=["Urban", "Trail", "Mountain", "Snow"]
+    )
+    
+    # Filter nodes
     valid_nodes = [
-        n for n in all_nodes 
-        if n['id'] == start_id or (n['elev'] <= max_elev and n['gear'] in allowed_gears)
+        n for n in all_nodes
+        if n["id"] == start_id or (n["elev"] <= max_elev and n["gear"] in gear_options)
     ]
     
-    n_sub = len(valid_nodes)
-    if n_sub < 1:
-        print("❌ No hay nodos que cumplan los criterios.")
+    if len(valid_nodes) < 1:
+        st.error("❌ No locations match your criteria.")
         return
-
-    ids_sub = [n['id'] for n in valid_nodes]
-    elevs_sub = [n['elev'] for n in valid_nodes]
     
-    # 5. Reconstruir Matriz Densa desde la Sparse
-    id_to_idx = {node['id']: i for i, node in enumerate(valid_nodes)}
-    valid_ids_set = set(id_to_idx.keys())
-
-    sub_matrix = np.full((n_sub, n_sub), float(INF))
-    np.fill_diagonal(sub_matrix, 0)
-
-    for row in sparse_matrix:
-        u, v, w = int(row[0]), int(row[1]), int(row[2])
-        if u in valid_ids_set and v in valid_ids_set:
-            sub_matrix[id_to_idx[u], id_to_idx[v]] = w
-
-    elevs_array = np.array(elevs_sub)
+    valid_ids = [n["id"] for n in valid_nodes]
+    elevs = [n["elev"] for n in valid_nodes]
+    
+    # Build submatrices
+    sub_matrix_times = build_submatrix(connectivity_matrix, labels, valid_ids)
+    
+    # Elevation differences matrix
+    elevs_array = np.array(elevs)
     elev_diff_matrix = np.abs(elevs_array[None, :] - elevs_array[:, None])
-
-    # --- CREACIÓN DE DATAFRAMES CON IDs ---
-    df_tiempos = pd.DataFrame(sub_matrix, index=ids_sub, columns=ids_sub)
-    df_desniveles = pd.DataFrame(elev_diff_matrix, index=ids_sub, columns=ids_sub)
-    print("\n✅ Matriz de tiempos (en minutos):")
-    print(df_tiempos)
-    print("\n✅ Matriz de desniveles (en metros):")
-    print(df_desniveles)
-
-    return df_tiempos, df_desniveles
+    
+    # Main content tabs
+    tab1, tab2, tab3 = st.tabs(["⏱️ Travel Times", "📊 Elevation Differences", "💾 Downloads"])
+    
+    with tab1:
+        st.subheader("Travel Time Matrix (minutes)")
+        st.markdown(f"**{len(valid_ids)}** locations selected • Starting point: **[{start_id}] {node_dict[start_id]['name']}**")
+        
+        # Display matrix with proper formatting
+        display_times = format_matrix_display(sub_matrix_times, inf_value=INF)
+        df_times = pd.DataFrame(display_times, index=valid_ids, columns=valid_ids)
+        
+        # Style the dataframe
+        def highlight_infinite(val):
+            if val == "∞":
+                return "background-color: #ff0000; color: black"
+            elif val == 0:
+                return "background-color: #000000; color: white"
+            else:
+                return "background-color: #000000; color: white"
+        
+        styled_df = df_times.style.applymap(highlight_infinite)
+        st.dataframe(styled_df, use_container_width=True)
+            
+    with tab2:
+        st.subheader("Elevation Difference Matrix (meters)")
+        df_elev = pd.DataFrame(elev_diff_matrix, index=valid_ids, columns=valid_ids)
+        
+        def highlight_elev(val):
+            if val == 0:
+                return "background-color: #000000; color: white"
+            elif val > 500:
+                return "background-color: #000000; color: white"
+            return "background-color: #000000; color: white"
+        
+        styled_elev = df_elev.style.applymap(highlight_elev)
+        st.dataframe(styled_elev, use_container_width=True)
+    
+    with tab3:
+        st.subheader("📥 Download Results")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Travel Times**")
+            
+            # Sparse CSV
+            sparse_times = convert_to_sparse(valid_ids, sub_matrix_times)
+            sparse_csv = sparse_to_csv(sparse_times)
+            st.download_button(
+                label="⬇️ Sparse CSV",
+                data=sparse_csv,
+                file_name="travel_times_sparse.csv",
+                mime="text/csv",
+                key="sparse_times"
+            )
+            
+            # Dense CSV
+            dense_csv = dense_to_csv(sub_matrix_times, valid_ids)
+            st.download_button(
+                label="⬇️ Dense CSV",
+                data=dense_csv,
+                file_name="travel_times_dense.csv",
+                mime="text/csv",
+                key="dense_times"
+            )
+        
+        with col2:
+            st.markdown("**Elevation Differences**")
+            elev_dense_csv = dense_to_csv(elev_diff_matrix, valid_ids)
+            st.download_button(
+                label="⬇️ Dense CSV",
+                data=elev_dense_csv,
+                file_name="elevation_diff_dense.csv",
+                mime="text/csv",
+                key="dense_elev"
+            )
 
 
 if __name__ == "__main__":
