@@ -6,9 +6,9 @@ from pathlib import Path
 # 1. IMPORTACIÓN DESDE TU OTRO SCRIPT
 # Importamos la función que creamos en preprocessing2.py
 try:
-    from routes_creator import get_sparse_connectivity, INF
+    from sparse_creator import get_sparse_connectivity, INF
 except ImportError:
-    print("❌ Error: No se pudo importar 'get_sparse_connectivity' de preprocessing2.py")
+    print("❌ Error: No se pudo importar 'get_sparse_connectivity' de routes_creator.py")
     print("Asegúrate de que ambos archivos estén en la misma carpeta.")
     INF = 999999
 
