@@ -35,7 +35,7 @@ def H_cost(d, M):
                     continue
                 ind1 = indx(i, j)
                 ind2 = indx(i + 1, k)
-                H_cost += d(j, k) * x_op(ind1, N) @ x_op(ind2, N)
+                H_cost += d(j, k) * x_op(ind1, N * M) @ x_op(ind2, N * M)
     return H_cost
 
 
@@ -43,10 +43,10 @@ def H_1(N, M):
     total = 0
     for i in range(M):
         for j in range(N):
-            total -= x_op(indx(i, j))
+            total -= x_op(indx(i, j), N * M)
         for j in range(N):
             for k in range(j + 2, N):
-                total += 2 * x_op(indx(i, j)) @ x_op(indx(i, k))
+                total += 2 * x_op(indx(i, j), N * M) @ x_op(indx(i, k), N * M)
     return total
 
 
@@ -54,10 +54,10 @@ def H_2(N, M):
     total = 0
     for i in range(N):
         for j in range(M):
-            total -= x_op(indx(i, j))
+            total -= x_op(indx(i, j), N * M)
         for j in range(M):
             for k in range(j + 2, M):
-                total += 2 * x_op(indx(i, j)) @ x_op(indx(k, j))
+                total += 2 * x_op(indx(i, j), N * M) @ x_op(indx(k, j), N * M)
     return total
 
 
@@ -66,7 +66,7 @@ def H_3(t, N, M):
     for i in range(M):
         for j in range(N):
             for k in range(N):
-                total += t(j, k) * x_op(indx(i, j)) @ x_op(indx(i + 1, k))
+                total += t(j, k) * x_op(indx(i, j), N * M) @ x_op(indx(i + 1, k), N * M)
     return total
 
 
@@ -74,9 +74,9 @@ def H_4(N, M):
     total = 0
     for i in range(N):
         total += (
-            x_op(indx(1, i))
-            + x_op(indx(M, i))
-            - 2 * x_op(indx(1, i)) @ x_op(indx(M, i))
+            x_op(indx(1, i), N * M)
+            + x_op(indx(M, i), N * M)
+            - 2 * x_op(indx(1, i), N * M) @ x_op(indx(M, i), N * M)
         )
     return total
 
@@ -86,7 +86,9 @@ def H_5(deltah, N, M):
     for i in range(M):
         for j in range(N):
             for k in range(N):
-                total += deltah(j, k) * x_op(indx(i, j)) @ x_op(indx(i + 1, k))
+                total += (
+                    deltah(j, k) * x_op(indx(i, j), N * M) @ x_op(indx(i + 1, k), N * M)
+                )
     return total
 
 
