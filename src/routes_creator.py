@@ -20,7 +20,15 @@ def load_data():
 
     nodes, labels, connectivity_matrix = load_graph_data(csv_path)
     
-    node_dict = {node.id: {"name": node.place, "elev": node.elevation, "gear": node.summer_gear} for node in nodes}
+    node_dict = {
+        node.id: {
+            "name": node.place,
+            "elev": node.elevation,
+            "winter_gear": node.winter_gear,
+            "summer_gear": node.summer_gear,
+        }
+        for node in nodes
+    }
     
     return labels, connectivity_matrix, node_dict
 
@@ -214,7 +222,17 @@ def main():
     
     # Load data
     labels, connectivity_matrix, node_dict = load_data()
-    all_nodes = [{"id": label, "name": node_dict[label]["name"], "elev": node_dict[label]["elev"], "gear": node_dict[label]["gear"]} for label in labels]
+    all_nodes = [
+        {
+            "id": label,
+            "name": node_dict[label]["name"],
+            "elev": node_dict[label]["elev"],
+            "winter_gear": node_dict[label]["winter_gear"],
+            "summer_gear": node_dict[label]["summer_gear"],
+            "gear": node_dict[label]["summer_gear"],
+        }
+        for label in labels
+    ]
     
     # Sidebar for preferences
     st.sidebar.header("⚙️ Route Preferences")
@@ -265,12 +283,13 @@ def main():
     elev_diff_todor_matrix = np.maximum(elev_diff_matrix, 0)
     
     # Main content tabs
-    tab1, tab2, tab26, tab25, tab4, tab3 = st.tabs([
+    tab1, tab2, tab26, tab25, tab4, tab5, tab3 = st.tabs([
         "⏱️ Travel Times",
         "📊 Elevation Differences",
         "📈 Elevation Absolute Difference",
         "Elevation Todor",
         "🕸️ Graph",
+        "🧭 Node Info",
         "💾 Downloads",
     ])
     
@@ -401,6 +420,59 @@ def main():
             availability_matrix=availability_matrix,
         )
         st.graphviz_chart(dot_graph)
+
+    with tab5:
+        st.subheader("Node Information")
+        base_node_info_df = pd.DataFrame(
+            [
+                {
+                    "id": node["id"],
+                    "name": node["name"],
+                    "elevation_m": node["elev"],
+                    "winter_gear": node["winter_gear"],
+                    "summer_gear": node["summer_gear"],
+                }
+                for node in valid_nodes
+            ]
+        ).sort_values("id")
+
+        current_signature = tuple(base_node_info_df["id"].tolist())
+        if (
+            "node_info_editor_df" not in st.session_state
+            or st.session_state.get("node_info_signature") != current_signature
+        ):
+            st.session_state["node_info_editor_df"] = base_node_info_df.copy()
+            st.session_state["node_info_signature"] = current_signature
+
+        st.markdown("Add a new column")
+        col_a, col_b, col_c = st.columns([2, 2, 1])
+        with col_a:
+            new_col_name = st.text_input("Column name", value="", key="new_node_col_name")
+        with col_b:
+            new_col_type = st.selectbox("Column type", ["Text", "Number", "Boolean"], key="new_node_col_type")
+        with col_c:
+            st.write("")
+            if st.button("Add column", key="add_node_col_btn"):
+                if not new_col_name.strip():
+                    st.warning("Column name cannot be empty.")
+                elif new_col_name in st.session_state["node_info_editor_df"].columns:
+                    st.warning("That column already exists.")
+                else:
+                    if new_col_type == "Text":
+                        default_value = ""
+                    elif new_col_type == "Number":
+                        default_value = 0.0
+                    else:
+                        default_value = False
+                    st.session_state["node_info_editor_df"][new_col_name] = default_value
+
+        edited_node_info_df = st.data_editor(
+            st.session_state["node_info_editor_df"],
+            use_container_width=True,
+            num_rows="dynamic",
+            key="node_info_editor_widget",
+        )
+        st.session_state["node_info_editor_df"] = edited_node_info_df
     
     with tab3:
         st.subheader("📥 Download Results")
