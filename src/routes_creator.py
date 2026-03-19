@@ -131,10 +131,10 @@ def main():
     
     # Elevation differences matrix
     elevs_array = np.array(elevs)
-    elev_diff_matrix = np.abs(elevs_array[None, :] - elevs_array[:, None])
+    elev_diff_matrix = elevs_array[None, :] - elevs_array[:, None]
     
     # Main content tabs
-    tab1, tab2, tab3 = st.tabs(["⏱️ Travel Times", "📊 Elevation Differences", "💾 Downloads"])
+    tab1, tab2, tab25, tab3 = st.tabs(["⏱️ Travel Times", "📊 Elevation Differences", "Elevation Todor", "💾 Downloads"])
     
     with tab1:
         st.subheader("Travel Time Matrix (minutes)")
@@ -169,6 +169,22 @@ def main():
         
         styled_elev = df_elev.style.applymap(highlight_elev)
         st.dataframe(styled_elev, use_container_width=True)
+
+    with tab25:
+        st.subheader("Elevation Difference Matrix (meters) - Todor Style")
+        df_elev_todor = pd.DataFrame(elev_diff_matrix, index=valid_ids, columns=valid_ids)
+
+        # The negative values as 0
+        df_elev_todor[df_elev_todor < 0] = 0
+        
+        def color_elev(val):
+            if val == 0:
+                return "background-color: #000000; color: white"
+            else:
+                return "background-color: #000000; color: white"
+        
+        styled_elev_todor = df_elev_todor.style.applymap(color_elev)
+        st.dataframe(styled_elev_todor, use_container_width=True)
     
     with tab3:
         st.subheader("📥 Download Results")
