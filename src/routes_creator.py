@@ -77,6 +77,73 @@ def dense_to_csv(matrix, node_ids):
     return output.getvalue()
 
 
+def build_graphviz_dot(valid_ids, sub_matrix_times, node_dict, label_mode="Name"):
+    """Build a Graphviz DOT graph with weighted edges."""
+    labels = {}
+    for node_id in valid_ids:
+        if label_mode == "Name":
+            labels[node_id] = node_dict[node_id]["name"]
+        else:
+            labels[node_id] = str(node_id)
+
+    lines = [
+        "digraph RouteGraph {",
+        "rankdir=LR;",
+        "bgcolor=white;",
+        "node [shape=circle, style=filled, fillcolor=black, fontcolor=white, color=black];",
+    ]
+
+    for node_id in valid_ids:
+        node_label = labels[node_id].replace('"', "\\\"")
+        lines.append(f'"{node_id}" [label="{node_label}"];')
+
+    matrix_np = np.asarray(sub_matrix_times)
+
+    positive_weights = []
+    for i, source in enumerate(valid_ids):
+        for j, target in enumerate(valid_ids):
+            if source == target:
+                continue
+            weight = matrix_np[i, j]
+            if weight != INF and weight > 0:
+                positive_weights.append(float(weight))
+
+    min_w = min(positive_weights) if positive_weights else 1.0
+    max_w = max(positive_weights) if positive_weights else 1.0
+
+    def normalize(weight: float) -> float:
+        if max_w == min_w:
+            return 1.0
+        return (weight - min_w) / (max_w - min_w)
+
+    def gradient_green_to_black(weight: float) -> str:
+        t = normalize(weight)
+        start_r, start_g, start_b = (0, 170, 0)
+        end_r, end_g, end_b = (0, 0, 0)
+        r = int(start_r + (end_r - start_r) * t)
+        g = int(start_g + (end_g - start_g) * t)
+        b = int(start_b + (end_b - start_b) * t)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    for i, source in enumerate(valid_ids):
+        for j, target in enumerate(valid_ids):
+            weight = matrix_np[i, j]
+            if source != target and weight != INF:
+                if weight == 0:
+                    lines.append(
+                        f'"{source}" -> "{target}" [label="0", style="dashed", color="#2e7d32", fontcolor="#2e7d32", penwidth="1.0"];'
+                    )
+                else:
+                    edge_color = gradient_green_to_black(float(weight))
+                    penwidth = 1.2 + 2.8 * normalize(float(weight))
+                    lines.append(
+                        f'"{source}" -> "{target}" [label="{int(weight)}", color="{edge_color}", fontcolor="{edge_color}", penwidth="{penwidth:.2f}"];'
+                    )
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
 def main():
     st.set_page_config(page_title="🌲 Route Creator", layout="wide")
     
@@ -134,7 +201,13 @@ def main():
     elev_diff_matrix = elevs_array[None, :] - elevs_array[:, None]
     
     # Main content tabs
-    tab1, tab2, tab25, tab3 = st.tabs(["⏱️ Travel Times", "📊 Elevation Differences", "Elevation Todor", "💾 Downloads"])
+    tab1, tab2, tab25, tab4, tab3 = st.tabs([
+        "⏱️ Travel Times",
+        "📊 Elevation Differences",
+        "Elevation Todor",
+        "🕸️ Graph",
+        "💾 Downloads",
+    ])
     
     with tab1:
         st.subheader("Travel Time Matrix (minutes)")
@@ -185,6 +258,14 @@ def main():
         
         styled_elev_todor = df_elev_todor.style.applymap(color_elev)
         st.dataframe(styled_elev_todor, use_container_width=True)
+
+    with tab4:
+        st.subheader("Graph View")
+        label_mode = st.radio("Node labels:", ["Name", "ID"], horizontal=True)
+        st.caption("Edge labels are travel times in minutes.")
+
+        dot_graph = build_graphviz_dot(valid_ids, sub_matrix_times, node_dict, label_mode=label_mode)
+        st.graphviz_chart(dot_graph)
     
     with tab3:
         st.subheader("📥 Download Results")
