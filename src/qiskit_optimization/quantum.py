@@ -2,6 +2,29 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.circuit import Parameter
 
 
+def get_J_h(H):
+    nqubits = H.num_qubits
+    J = [[0] * nqubits for _ in range(nqubits)]
+    h = [0] * nqubits
+
+    for pauli, coeff in zip(H.paulis, H.coeffs):
+        pauli = str(pauli)
+        if pauli.count('Z') == 0:
+            continue
+        elif pauli.count('Z') == 1:
+            i = pauli.find("Z")
+            h[i] += coeff
+        elif pauli.count('Z') == 2:
+            i = pauli.find("Z")
+            j = pauli.find("Z", i + 1)
+            J[i][j] += coeff
+            
+
+    return J, h
+
+
+
+
 def create_qaoa_circ(theta, J, h, p=1):
     nqubits = len(h)
     qc = QuantumCircuit(nqubits)
@@ -62,3 +85,5 @@ def get_expectation(backend, theta, J, h, shots=512):
     qc = create_qaoa_circ(theta)
     counts = backend.run(qc, nshots=shots).result().get_counts()
     return compute_expectation(counts, J, h)
+
+
