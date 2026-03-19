@@ -30,7 +30,7 @@ def indx(i, j, N):
 def H_cost(d, M):
     H_cost = None
     N = len(d)
-    for i in range(M-1):
+    for i in range(M - 1):
         for j in range(N):
             for k in range(N):
                 if d[j, k] == 0:
@@ -70,32 +70,36 @@ def H_2(N, M):
 
 def H_3(t, N, M):
     total = None
-    for i in range(M-1):
+    for i in range(M - 1):
         for j in range(N):
             for k in range(N):
-                term = t[j, k] * x_op(indx(i, j, N), N * M) @ x_op(indx(i + 1, k, N), N * M)
+                term = (
+                    t[j, k]
+                    * x_op(indx(i, j, N), N * M)
+                    @ x_op(indx(i + 1, k, N), N * M)
+                )
                 total = term if total is None else total + term
     return total
 
 
-def H_4(N, M):
+def H_4(a, b, N, M):
     total = None
     for i in range(N):
-        term = (
-            x_op(indx(1, i, N), N * M)
-            + x_op(indx(M-1, i, N), N * M)
-            - 2 * x_op(indx(1, i, N), N * M) @ x_op(indx(M-1, i, N), N * M)
-        )
+        term = -x_op(indx(0, a, N), N * M) - x_op(indx(M - 1, b, N), N * M)
         total = term if total is None else total + term
     return total
 
 
 def H_5(deltah, N, M):
     total = None
-    for i in range(M-1):
+    for i in range(M - 1):
         for j in range(N):
             for k in range(N):
-                term = deltah[j, k] * x_op(indx(i, j, N), N * M) @ x_op(indx(i + 1, k, N), N * M)
+                term = (
+                    deltah[j, k]
+                    * x_op(indx(i, j, N), N * M)
+                    @ x_op(indx(i + 1, k, N), N * M)
+                )
                 total = term if total is None else total + term
     return total
 
@@ -107,5 +111,3 @@ def H_total(lambdas, deltah, t, N, M, alpha=0.05):
     for i in range(len(H)):
         total += lambdas[i] * H[i]
     return total
-
-
