@@ -7,7 +7,7 @@ import numpy as np
 try:
 	from preprocessing import INF, load_graph_data
 except ModuleNotFoundError:
-	from .preprocessing import INF, load_graph_data
+	from ..preprocessing import INF, load_graph_data
 
 
 def build_weight_matrix(connectivity_minutes: list[list[int]] | np.ndarray) -> np.ndarray:
