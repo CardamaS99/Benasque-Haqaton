@@ -3,7 +3,7 @@ from quantum import get_expectation, get_J_h, create_qaoa_circ
 import numpy as np
 from scipy.optimize import minimize
 import pandas as pd
-from qmiotools.integrations.qiskitqmio import QmioBackend
+from qmiotools.integrations.qiskitqmio import QmioBackend, FakeQmio
 
 
 df_t1 = pd.read_csv('../../data/tiempos.csv')
@@ -19,16 +19,23 @@ print("getting J,h")
 J, h = get_J_h(hamil)
 
 ansatz = create_qaoa_circ(J, h)
-backend = QmioBackend(reservation_name="Benasque_QPU", tunnel_time_limit="00:10:00")
+# backend = QmioBackend(reservation_name="Benasque_QPU", tunnel_time_limit="00:10:00")
+backend = FakeQmio()
+
+from qiskit_aer import AerSimulator
+
+# backend = AerSimulator()
 
 from qiskit import transpile
 
 ansatz = transpile(ansatz, backend)
+print("transpilado")
 
 def cost_qmio(params):
     circuit = ansatz.assign_parameters(params)
     return get_expectation(circuit,backend, J, h)
 
+print(ansatz)
 
 init_params = np.random.uniform(-np.pi, np.pi, 2)
 

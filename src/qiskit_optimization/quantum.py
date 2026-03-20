@@ -38,12 +38,12 @@ def create_qaoa_circ(J, h, p=1):
         for i in range(nqubits):
             for j in range(nqubits):
                 if i != j:
-                    qc.rzz(2 * J[i][j] * param, i, j)
+                    qc.rzz((2 * J[i][j] * param)/999999, i, j)
             qc.rz(2 * h[i] * param, i)
         # Hamiltoniano mestura
         param = Parameter(f"beta{irep}")
         for i in range(0, nqubits):
-            qc.rx(2 * param, i)
+            qc.rx((2 * param)/999999, i)
 
     qc.measure_all()
 
@@ -55,10 +55,10 @@ def ising_value(J, h, x):
     nqubits = len(h)
     for i in range(nqubits):
         for j in range(nqubits):
-            value -= J[i][j] * x[i] * x[j]
+            value -= J[i][j] * int(x[i]) * int(x[j])
 
     for i in range(nqubits):
-        value -= h[i] * x[i]
+        value -= h[i] * int(x[i])
 
     return value
 
@@ -76,8 +76,9 @@ def compute_expectation(counts, J, h):
     return avg / sum_count
 
 
-def get_expectation(qc, backend, J, h, shots=100):
-    counts = backend.run(qc, nshots=shots, repetition_period = 400e-4).result().get_counts()
+def get_expectation(qc, backend, J, h, shots=1):
+    print("cooost")
+    counts = backend.run(qc, nshots=shots).result().get_counts()
     return compute_expectation(counts, J, h)
 
 
