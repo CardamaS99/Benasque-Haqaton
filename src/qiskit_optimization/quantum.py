@@ -76,7 +76,7 @@ def compute_expectation(counts, J, h):
     return avg / sum_count
 
 
-def get_expectation(qc, backend, J, h, shots=512):
+def get_expectation(qc, backend, J, h, shots=100):
     counts = backend.run(qc, nshots=shots, repetition_period = 400e-4).result().get_counts()
     return compute_expectation(counts, J, h)
 
