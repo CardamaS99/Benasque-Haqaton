@@ -21,6 +21,10 @@ J, h = get_J_h(hamil)
 ansatz = create_qaoa_circ(J, h)
 backend = QmioBackend(reservation_name="Benasque_QPU", tunnel_time_limit="00:10:00")
 
+from qiskit import transpile
+
+ansatz = transpile(ansatz, backend)
+
 def cost_qmio(params):
     circuit = ansatz.assign_parameters(params)
     return get_expectation(circuit,backend, J, h)
