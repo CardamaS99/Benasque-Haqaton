@@ -104,9 +104,9 @@ def H_5(deltah, N, M):
     return total
 
 
-def H_total(lambdas, deltah, t, N, M, alpha=0.05):
+def H_total(lambdas, deltah, t,a,b, N, M, alpha=0.01):
     d = t + alpha * deltah
-    H = [H_1(N, M), H_2(N, M), H_3(t, N, M), H_4(N, M), H_5(deltah, N, M)]
+    H = [H_1(N, M), H_2(N, M), H_3(t, N, M), H_4(a,b,N, M), H_5(deltah, N, M)]
     total = H_cost(d, M)
     for i in range(len(H)):
         total += lambdas[i] * H[i]

@@ -23,14 +23,9 @@ def get_J_h(H):
     return J, h
 
 
-
-
-def create_qaoa_circ(theta, J, h, p=1):
+def create_qaoa_circ(J, h, p=1):
     nqubits = len(h)
     qc = QuantumCircuit(nqubits)
-
-    beta = theta[:p]
-    gamma = theta[p:]
 
     # estado inicial
     for i in range(0, nqubits):
@@ -39,15 +34,16 @@ def create_qaoa_circ(theta, J, h, p=1):
     for irep in range(0, p):
 
         # Hamiltoniano problema
+        param = Parameter(f"gamma{irep}")
         for i in range(nqubits):
             for j in range(nqubits):
-                qc.rzz(2 * J[i, j] * gamma[irep], i, j)
-
-        for i in range(nqubits):
-            qc.rz(2 * h(i) * gamma[irep], i)
+                if i != j:
+                    qc.rzz(2 * J[i][j] * param, i, j)
+            qc.rz(2 * h[i] * param, i)
         # Hamiltoniano mestura
+        param = Parameter(f"beta{irep}")
         for i in range(0, nqubits):
-            qc.rx(2 * beta[irep], i)
+            qc.rx(2 * param, i)
 
     qc.measure_all()
 
@@ -59,7 +55,7 @@ def ising_value(J, h, x):
     nqubits = len(h)
     for i in range(nqubits):
         for j in range(nqubits):
-            value -= J[i, j] * x[i] * x[j]
+            value -= J[i][j] * x[i] * x[j]
 
     for i in range(nqubits):
         value -= h[i] * x[i]
@@ -80,9 +76,7 @@ def compute_expectation(counts, J, h):
     return avg / sum_count
 
 
-def get_expectation(backend, theta, J, h, shots=512):
-
-    qc = create_qaoa_circ(theta)
+def get_expectation(qc, backend, J, h, shots=512):
     counts = backend.run(qc, nshots=shots).result().get_counts()
     return compute_expectation(counts, J, h)
 
