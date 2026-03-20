@@ -77,7 +77,7 @@ def compute_expectation(counts, J, h):
 
 
 def get_expectation(qc, backend, J, h, shots=512):
-    counts = backend.run(qc, nshots=shots).result().get_counts()
+    counts = backend.run(qc, nshots=shots, repetition_period = 400e-4).result().get_counts()
     return compute_expectation(counts, J, h)
 
 
