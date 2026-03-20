@@ -6,10 +6,10 @@ import pandas as pd
 from qmiotools.integrations.qiskitqmio import QmioBackend
 
 
-df_t1 = pd.read_csv('../../data/tiempo_caso1.csv')
+df_t1 = pd.read_csv('../../data/tiempos.csv')
 tiempos = df_t1.to_numpy()
 
-df_d1 = pd.read_csv('../../data/distancia_caso1.csv')
+df_d1 = pd.read_csv('../../data/distances.csv')
 deltah = df_d1.to_numpy()
 
 print("About to calculate hamiltonian")
